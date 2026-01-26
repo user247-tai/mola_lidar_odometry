@@ -431,6 +431,18 @@ public:
       /// If provided by the IMU, prefer gravity-aligned orientation from the sensor instead of accelerometer data.
       bool use_imu_orientation = true;
 
+      /// Maximum position sigma (m) to accept state estimator as converged
+      /// Used when method == FromStateEstimator
+      double from_state_estimator_max_position_sigma = 0.5;  // [m]
+
+      /// Maximum orientation sigma (deg) to accept state estimator as converged
+      /// Used when method == FromStateEstimator
+      double from_state_estimator_max_orientation_sigma_deg = 3.0;  // [deg]
+
+      /// Timeout (seconds) waiting for state estimator to converge
+      /// If <=0, wait indefinitely
+      double from_state_estimator_timeout = 60.0;  // [s]
+
       void initialize(const Yaml & c);
     };
 
@@ -621,6 +633,12 @@ private:
     std::optional<mrpt::Clock::time_point> first_ever_timestamp;
     std::optional<mrpt::Clock::time_point> last_obs_timestamp;
     std::optional<mrpt::Clock::time_point> last_icp_timestamp;
+
+    /// Timestamp when we started waiting for state estimator convergence
+    std::optional<mrpt::Clock::time_point> waiting_for_state_estimator_since;
+
+    /// Received georeferencing from external state estimator
+    std::optional<mola::Georeferencing> external_georef;
 
     /// Cache for multiple LIDAR synchronization:
     std::map<std::string /*label*/, mrpt::obs::CObservation::ConstPtr> sync_obs;
@@ -829,6 +847,9 @@ private:
 
   void doRemoveCloudsWithDecay();
 
+  void onExternalMapUpdate(const MapSourceBase::MapUpdate & mu);
+  void onExternalLocalizationUpdate(const LocalizationSourceBase::LocalizationUpdate & lu);
+
   void doPublishUpdatedLocalization(const mrpt::Clock::time_point & this_obs_tim);
 
   void doPublishUpdatedLocalMap(const mrpt::Clock::time_point & this_obs_tim);
@@ -844,6 +865,8 @@ private:
 
   void onPublishDiagnostics();
   void handleInitialLocalization();
+  void handleInitialLocalizationStateEstimation();
+  void handleInitialLocalizationDoInitFromPose(const mrpt::poses::CPose3DPDFGaussian & initPose);
 
   bool isPipelineUsingIMU() const;
   void sendLidarScanToProcessQueue(const CObservation::ConstPtr & o);
