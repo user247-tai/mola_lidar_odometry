@@ -3,24 +3,49 @@
 from launch import LaunchDescription
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.conditions import IfCondition
-from launch_ros.actions import Node
-from launch_ros.actions import PushRosNamespace
-from launch.actions import DeclareLaunchArgument
-from launch.actions import SetEnvironmentVariable
-from launch.actions import GroupAction
-from launch.actions import Shutdown
+from launch_ros.actions import Node, PushRosNamespace
+from launch.actions import (DeclareLaunchArgument, SetEnvironmentVariable,
+                            GroupAction, Shutdown, OpaqueFunction)
 from ament_index_python import get_package_share_directory
 import os
 
 
+def resolve_state_estimator_config(context, *args, **kwargs):
+    """
+    Runtime logic to resolve the YAML path. This prevents the launch file 
+    from crashing if the optional smoother package is missing.
+    """
+    use_smoother = LaunchConfiguration(
+        'use_state_estimator').perform(context).lower() == 'true'
+    user_provided_path = LaunchConfiguration(
+        'state_estimator_config_yaml').perform(context)
+
+    # If the user manually provided a path via CLI, use that.
+    if user_provided_path.strip() != "":
+        return [SetEnvironmentVariable(name='MOLA_STATE_ESTIMATOR_YAML', value=user_provided_path)]
+
+    # Otherwise, determine the default based on the estimator type
+    if use_smoother:
+        try:
+            smoother_dir = get_package_share_directory(
+                "mola_state_estimation_smoother")
+            yaml_path = os.path.join(
+                smoother_dir, "params", "state-estimation-smoother.yaml")
+        except Exception:
+            # Package missing: We only throw an error if the user explicitly requested the smoother
+            raise RuntimeError(
+                "\n\n[ERROR] 'use_state_estimator' is True, but the package 'mola_state_estimation_smoother' "
+                "was not found. Please install it or set 'use_state_estimator:=False'.\n"
+            )
+    else:
+        # Default path for the simple estimator
+        yaml_path = '../state-estimator-params/state-estimation-simple.yaml'
+
+    return [SetEnvironmentVariable(name='MOLA_STATE_ESTIMATOR_YAML', value=yaml_path)]
+
+
 def generate_launch_description():
     myDir = get_package_share_directory("mola_lidar_odometry")
-
-    # Path to the smoother package share directory
-    smoother_dir = get_package_share_directory(
-        "mola_state_estimation_smoother")
-    smoother_yaml_path = os.path.join(
-        smoother_dir, "params", "state-estimation-smoother.yaml")
 
     # -------------------
     #     Arguments
@@ -38,36 +63,26 @@ def generate_launch_description():
         "navstate_kinematic_model",
         default_value="KinematicModel::ConstantVelocity",
         description="[Smoother only] Kinematic model for internal motion model factors. Options: KinematicModel::ConstantVelocity, KinematicModel::Tricycle.")
-    navstate_kinematic_model_env_var = SetEnvironmentVariable(
-        name='MOLA_NAVSTATE_KINEMATIC_MODEL', value=LaunchConfiguration('navstate_kinematic_model'))
 
     navstate_sliding_window_sec_arg = DeclareLaunchArgument(
         "navstate_sliding_window_sec",
         default_value="2.5",
         description="[Smoother only] Time window to keep past observations in the filter [seconds].")
-    navstate_sliding_window_sec_env_var = SetEnvironmentVariable(
-        name='MOLA_NAVSTATE_SLIDING_WINDOW_SEC', value=LaunchConfiguration('navstate_sliding_window_sec'))
 
     navstate_sigma_random_walk_linacc_arg = DeclareLaunchArgument(
         "navstate_sigma_random_walk_linacc",
         default_value="1.0",
         description="[Smoother only] Random walk model for linear acceleration uncertainty [m/s²].")
-    navstate_sigma_random_walk_linacc_env_var = SetEnvironmentVariable(
-        name='MOLA_NAVSTATE_SIGMA_RANDOM_WALK_LINACC', value=LaunchConfiguration('navstate_sigma_random_walk_linacc'))
 
     navstate_sigma_random_walk_angacc_arg = DeclareLaunchArgument(
         "navstate_sigma_random_walk_angacc",
         default_value="10.0",
-        description="[Smoother only] Random walk model for angular acceleration uncertainty [rad/s²].")
-    navstate_sigma_random_walk_angacc_env_var = SetEnvironmentVariable(
-        name='MOLA_NAVSTATE_SIGMA_RANDOM_WALK_ANGACC', value=LaunchConfiguration('navstate_sigma_random_walk_angacc'))
+        description="[Smoother only] Random walk angular acceleration uncertainty [rad/s²].")
 
     estimate_geo_reference_arg = DeclareLaunchArgument(
         "estimate_geo_reference",
         default_value="False",
         description="[Smoother only] Whether to estimate the best geo-referencing for {enu} -> {map} from incoming GNSS readings.")
-    estimate_geo_reference_env_var = SetEnvironmentVariable(
-        name='MOLA_ESTIMATE_GEO_REF', value=LaunchConfiguration('estimate_geo_reference'))
 
     # ~~~~~~~~~~~~
     # Standard Arguments
@@ -172,16 +187,33 @@ def generate_launch_description():
         name='MOLA_LO_INITIAL_LOCALIZATION_METHOD', value=LaunchConfiguration('initial_localization_method'))
 
     use_state_estimator_arg = DeclareLaunchArgument(
-        "use_state_estimator",
-        default_value="False",
-        description="If true, 'mola::state_estimation_smoother::StateEstimationSmoother' is used."
+        "use_state_estimator", default_value="False",
+        description="If true, uses StateEstimationSmoother (requires optional package).")
+
+    # Environment variables that only apply if the smoother is active
+    smoother_env_vars = GroupAction(
+        condition=IfCondition(LaunchConfiguration('use_state_estimator')),
+        actions=[
+            SetEnvironmentVariable('MOLA_NAVSTATE_KINEMATIC_MODEL', LaunchConfiguration(
+                'navstate_kinematic_model')),
+            SetEnvironmentVariable('MOLA_NAVSTATE_SLIDING_WINDOW_SEC', LaunchConfiguration(
+                'navstate_sliding_window_sec')),
+            SetEnvironmentVariable('MOLA_NAVSTATE_SIGMA_RANDOM_WALK_LINACC', LaunchConfiguration(
+                'navstate_sigma_random_walk_linacc')),
+            SetEnvironmentVariable('MOLA_NAVSTATE_SIGMA_RANDOM_WALK_ANGACC', LaunchConfiguration(
+                'navstate_sigma_random_walk_angacc')),
+            SetEnvironmentVariable(
+                'MOLA_ESTIMATE_GEO_REF', LaunchConfiguration('estimate_geo_reference')),
+        ]
     )
+
+    # Class selection env var
     use_state_estimator_env_var = SetEnvironmentVariable(
-        name='MOLA_STATE_ESTIMATOR', value=PythonExpression(
-            ["'mola::state_estimation_smoother::StateEstimationSmoother' if ",
-             LaunchConfiguration('use_state_estimator'),
-             " else 'mola::state_estimation_simple::StateEstimationSimple'"
-             ]))
+        name='MOLA_STATE_ESTIMATOR', value=PythonExpression([
+            "'mola::state_estimation_smoother::StateEstimationSmoother' if ",
+            LaunchConfiguration('use_state_estimator'),
+            " else 'mola::state_estimation_simple::StateEstimationSimple'"
+        ]))
 
     localization_publish_tf_source_env_var = SetEnvironmentVariable(
         name='MOLA_LOCALIZATION_PUBLISH_TF_SOURCE',
@@ -197,15 +229,10 @@ def generate_launch_description():
                 'use_state_estimator'), " else 'lidar_odometry'"
         ])
     )
-
+    # Config YAML Argument (Default is empty to trigger OpaqueFunction auto-detection)
     state_estimator_config_yaml_arg = DeclareLaunchArgument(
-        "state_estimator_config_yaml",
-        default_value=PythonExpression([
-            f"'{smoother_yaml_path}' if ",
-            LaunchConfiguration('use_state_estimator'),
-            " else '../state-estimator-params/state-estimation-simple.yaml'"
-        ]),
-        description="YAML file with settings for the state estimator.")
+        "state_estimator_config_yaml", default_value="",
+        description="Path to estimator YAML. If empty, it is auto-resolved based on use_state_estimator.")
 
     state_estimator_config_yaml_env_var = SetEnvironmentVariable(
         name='MOLA_STATE_ESTIMATOR_YAML', value=LaunchConfiguration('state_estimator_config_yaml'))
@@ -342,15 +369,15 @@ def generate_launch_description():
 
         # Smoother Specific
         navstate_kinematic_model_arg,
-        navstate_kinematic_model_env_var,
         navstate_sliding_window_sec_arg,
-        navstate_sliding_window_sec_env_var,
         navstate_sigma_random_walk_linacc_arg,
-        navstate_sigma_random_walk_linacc_env_var,
         navstate_sigma_random_walk_angacc_arg,
-        navstate_sigma_random_walk_angacc_env_var,
         estimate_geo_reference_arg,
-        estimate_geo_reference_env_var,
+        smoother_env_vars,
+
+        # Config YAML Handling
+        state_estimator_config_yaml_arg,
+        OpaqueFunction(function=resolve_state_estimator_config),
 
         # Config YAML must come later
         state_estimator_config_yaml_arg,

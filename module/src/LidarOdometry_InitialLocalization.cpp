@@ -227,9 +227,8 @@ void LidarOdometry::handleInitialLocalizationStateEstimation()
   if (converged) {
     const double pos_sigma_max = std::sqrt(
       std::max({estimatedPose.cov(0, 0), estimatedPose.cov(1, 1), estimatedPose.cov(2, 2)}));
-    const double ori_sigma_max_deg = mrpt::RAD2DEG(
-      std::sqrt(
-        std::max({estimatedPose.cov(3, 3), estimatedPose.cov(4, 4), estimatedPose.cov(5, 5)})));
+    const double ori_sigma_max_deg = mrpt::RAD2DEG(std::sqrt(
+      std::max({estimatedPose.cov(3, 3), estimatedPose.cov(4, 4), estimatedPose.cov(5, 5)})));
 
     if (
       pos_sigma_max > il.from_state_estimator_max_position_sigma ||

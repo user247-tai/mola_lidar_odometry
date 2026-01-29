@@ -40,7 +40,7 @@ modules:
 
     # This includes here a whole block "params: (...)":
     # Don't provide a default for the ROS2 system to make sure we are getting the env var from the launch file
-    params: "${MOLA_STATE_ESTIMATOR_YAML}"
+    params: "${MOLA_STATE_ESTIMATOR_YAML|no_default.yaml}"
 
   # =====================
   # ROS2 <-> MOLA
