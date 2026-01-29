@@ -866,7 +866,8 @@ private:
   void onPublishDiagnostics();
   void handleInitialLocalization();
   void handleInitialLocalizationStateEstimation();
-  void handleInitialLocalizationDoInitFromPose(const mrpt::poses::CPose3DPDFGaussian & initPose);
+  void handleInitialLocalizationDoInitFromPose(
+    const mrpt::poses::CPose3DPDFGaussian & initPose, bool resetStateEstimator);
 
   bool isPipelineUsingIMU() const;
   void sendLidarScanToProcessQueue(const CObservation::ConstPtr & o);

@@ -27,18 +27,23 @@ namespace mola
 {
 
 void LidarOdometry::handleInitialLocalizationDoInitFromPose(
-  const mrpt::poses::CPose3DPDFGaussian & initPose)
+  const mrpt::poses::CPose3DPDFGaussian & initPose, bool resetStateEstimator)
 {
-  ASSERT_(state_.navstate_fuse);
-  state_.navstate_fuse->reset();  // needed after a re-localization to forget the past
+  if (resetStateEstimator) {
+    ASSERT_(state_.navstate_fuse);
+    state_.navstate_fuse->reset();  // needed after a re-localization to forget the past
 
-  // Fake an evolution to be able to have an initial velocity estimation:
-  // Use a tiny time step to let the filter remain with a large uncertainty about twist:
-  ASSERT_(state_.last_obs_timestamp.has_value());
-  const auto t1 = mrpt::Clock::fromDouble(mrpt::Clock::toDouble(*state_.last_obs_timestamp) - 2e-3);
-  const auto t2 = mrpt::Clock::fromDouble(mrpt::Clock::toDouble(*state_.last_obs_timestamp) - 1e-3);
-  state_.navstate_fuse->fuse_pose(t1, initPose, params_.publish_reference_frame);
-  state_.navstate_fuse->fuse_pose(t2, initPose, params_.publish_reference_frame);
+    // Fake an evolution to be able to have an initial velocity estimation:
+    // Use a tiny time step to let the filter remain with a large uncertainty about twist:
+    ASSERT_(state_.last_obs_timestamp.has_value());
+    const auto t1 =
+      mrpt::Clock::fromDouble(mrpt::Clock::toDouble(*state_.last_obs_timestamp) - 2e-3);
+    const auto t2 =
+      mrpt::Clock::fromDouble(mrpt::Clock::toDouble(*state_.last_obs_timestamp) - 1e-3);
+    state_.navstate_fuse->fuse_pose(t1, initPose, params_.publish_reference_frame);
+    state_.navstate_fuse->fuse_pose(t2, initPose, params_.publish_reference_frame);
+  }
+
   // also, keep it as the last pose for subsequent ICP runs:
   state_.last_lidar_pose = initPose;
 }
@@ -59,7 +64,7 @@ void LidarOdometry::handleInitialLocalization()
         initPose.cov = *il.initial_pose_cov;
       }
 
-      handleInitialLocalizationDoInitFromPose(initPose);
+      handleInitialLocalizationDoInitFromPose(initPose, true);
       doRemoveCloudsWithDecay();
 
       MRPT_LOG_INFO_STREAM("Initial re-localization done with pose: " << initPose.mean);
@@ -105,7 +110,7 @@ void LidarOdometry::handleInitialLocalization()
         mrpt::poses::CPose3DPDFGaussian initPose;
         initPose.mean = mrpt::poses::CPose3D(il.fixed_initial_pose);
         initPose.cov.setDiagonal(1e-12);
-        handleInitialLocalizationDoInitFromPose(initPose);
+        handleInitialLocalizationDoInitFromPose(initPose, true);
         doRemoveCloudsWithDecay();
 
         state_.local_map->clear();
@@ -211,14 +216,20 @@ void LidarOdometry::handleInitialLocalizationStateEstimation()
   }
 
   // Now check if state estimator has converged
+#if MOLA_VERSION_CHECK(2, 5, 0)
   bool converged = state_.navstate_fuse->has_converged_localization(estimatedPose);
+#else
+  bool converged = false;
+  MRPT_LOG_THROTTLE_WARN(5.0, "Initialization from state estimation requires mola_kernel >= 2.5.0");
+#endif
 
   // Additional covariance check with our own thresholds
   if (converged) {
     const double pos_sigma_max = std::sqrt(
       std::max({estimatedPose.cov(0, 0), estimatedPose.cov(1, 1), estimatedPose.cov(2, 2)}));
-    const double ori_sigma_max_deg = mrpt::RAD2DEG(std::sqrt(
-      std::max({estimatedPose.cov(3, 3), estimatedPose.cov(4, 4), estimatedPose.cov(5, 5)})));
+    const double ori_sigma_max_deg = mrpt::RAD2DEG(
+      std::sqrt(
+        std::max({estimatedPose.cov(3, 3), estimatedPose.cov(4, 4), estimatedPose.cov(5, 5)})));
 
     if (
       pos_sigma_max > il.from_state_estimator_max_position_sigma ||
@@ -248,8 +259,10 @@ void LidarOdometry::handleInitialLocalizationStateEstimation()
     << estimatedPose.mean << " (sigmas: " << std::sqrt(estimatedPose.cov(0, 0)) << ", "
     << std::sqrt(estimatedPose.cov(1, 1)) << ", " << std::sqrt(estimatedPose.cov(2, 2)) << " m)");
 
-  handleInitialLocalizationDoInitFromPose(estimatedPose);
+  handleInitialLocalizationDoInitFromPose(estimatedPose, false);
   doRemoveCloudsWithDecay();
+
+  MRPT_TODO("Auto-transition into active after convergence");
 
   state_.initial_localization_done = true;
   state_.waiting_for_state_estimator_since.reset();
