@@ -234,9 +234,6 @@ def generate_launch_description():
         "state_estimator_config_yaml", default_value="",
         description="Path to estimator YAML. If empty, it is auto-resolved based on use_state_estimator.")
 
-    state_estimator_config_yaml_env_var = SetEnvironmentVariable(
-        name='MOLA_STATE_ESTIMATOR_YAML', value=LaunchConfiguration('state_estimator_config_yaml'))
-
     lidar_scan_validity_minimum_point_count_arg = DeclareLaunchArgument(
         "lidar_scan_validity_minimum_point_count", default_value="100")
     lidar_scan_validity_minimum_point_env_var = SetEnvironmentVariable(
@@ -378,7 +375,7 @@ def generate_launch_description():
         # Config YAML must come later
         state_estimator_config_yaml_arg,
         OpaqueFunction(function=resolve_state_estimator_config),
-        state_estimator_config_yaml_env_var,
+
         localization_publish_tf_source_env_var,
         localization_publish_odom_source_env_var,
         # group
