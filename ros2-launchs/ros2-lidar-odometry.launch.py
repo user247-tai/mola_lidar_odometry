@@ -242,7 +242,8 @@ def generate_launch_description():
         name='MOLA_ENABLE_OBS_VALIDITY_FILTER', value='True')
 
     mola_deskew_method_arg = DeclareLaunchArgument(
-        "mola_deskew_method", default_value="MotionCompensationMethod::Linear")
+        "mola_deskew_method", default_value="MotionCompensationMethod::Linear",
+        description="Which motion-compensation method to use to align LiDAR scans more precisely")
     mola_deskew_method_env_var = SetEnvironmentVariable(
         name='MOLA_DESKEW_METHOD', value=LaunchConfiguration('mola_deskew_method'))
 
