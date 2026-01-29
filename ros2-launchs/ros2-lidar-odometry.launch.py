@@ -375,12 +375,9 @@ def generate_launch_description():
         estimate_geo_reference_arg,
         smoother_env_vars,
 
-        # Config YAML Handling
-        state_estimator_config_yaml_arg,
-        OpaqueFunction(function=resolve_state_estimator_config),
-
         # Config YAML must come later
         state_estimator_config_yaml_arg,
+        OpaqueFunction(function=resolve_state_estimator_config),
         state_estimator_config_yaml_env_var,
         localization_publish_tf_source_env_var,
         localization_publish_odom_source_env_var,
