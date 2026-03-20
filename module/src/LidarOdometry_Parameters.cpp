@@ -224,7 +224,7 @@ void LidarOdometry::onParameterUpdate(const mrpt::containers::yaml & names_value
   }
 
   // and reflect changes in the GUI, if used.
-#if !MOLA_VERSION_CHECK(2, 6, 0)
+#if !MOLA_VERSION_CHECK(2, 7, 0)
   this->enqueue_request([this]() {
     auto lckGuiMtx = mrpt::lockHelper(state_gui_mtx_);
     if (gui_.cbActive) {

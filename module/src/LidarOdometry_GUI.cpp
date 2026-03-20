@@ -26,7 +26,7 @@
 #include <mola_kernel/version.h>
 
 // MRPT:
-#if !MOLA_VERSION_CHECK(2, 6, 0)
+#if !MOLA_VERSION_CHECK(2, 7, 0)
 #include <mrpt/gui/CDisplayWindowGUI.h>
 #endif
 #include <mrpt/maps/CGenericPointsMap.h>
@@ -43,7 +43,7 @@
 namespace mola
 {
 
-#if MOLA_VERSION_CHECK(2, 6, 0)
+#if MOLA_VERSION_CHECK(2, 7, 0)
 
 void LidarOdometry::internalBuildGUI()
 {
@@ -241,7 +241,7 @@ void LidarOdometry::internalBuildGUI()
   visualizer_->create_subwindow_from_description(desc).get();
 }
 
-#else  // !MOLA_VERSION_CHECK(2, 6, 0): legacy nanogui path
+#else  // !MOLA_VERSION_CHECK(2, 7, 0): legacy nanogui path
 
 void LidarOdometry::internalBuildGUI_Legacy()
 {
@@ -455,7 +455,7 @@ void LidarOdometry::internalBuildGUI_Legacy()
     });
 }
 
-#endif  // MOLA_VERSION_CHECK(2, 6, 0)
+#endif  // MOLA_VERSION_CHECK(2, 7, 0)
 
 void LidarOdometry::doRemoveCloudsWithDecay()
 {
@@ -583,7 +583,7 @@ void LidarOdometry::updateVisualization(
   // Sub-window with custom UI
   // -------------------------------------
   auto lckGuiMtx = mrpt::lockHelper(state_gui_mtx_);
-#if MOLA_VERSION_CHECK(2, 6, 0)
+#if MOLA_VERSION_CHECK(2, 7, 0)
   if (!gui_.gui_created) {
     internalBuildGUI();
     gui_.gui_created = true;
@@ -810,7 +810,7 @@ void LidarOdometry::updateVisualizationTextLabels()
 {
   const ProfilerEntry tle3(profiler_, "updateVisualization.update_gui");
 
-#if MOLA_VERSION_CHECK(2, 6, 0)
+#if MOLA_VERSION_CHECK(2, 7, 0)
   if (!gui_.lbIcpQuality) {
     return;  // GUI not yet created
   }
@@ -906,7 +906,7 @@ void LidarOdometry::updateVisualizationTextLabels()
     gui_.lbSpeed->setCaption("Speed: (Not available)");
   }
 
-#endif  // MOLA_VERSION_CHECK(2, 6, 0)
+#endif  // MOLA_VERSION_CHECK(2, 7, 0)
 }
 
 }  // namespace mola

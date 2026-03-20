@@ -63,7 +63,7 @@
 #include <vector>
 
 // Forward declarations:
-#if MOLA_VERSION_CHECK(2, 6, 0)
+#if MOLA_VERSION_CHECK(2, 7, 0)
 #include <mola_kernel/GuiWidgetDescription.h>
 #else
 namespace nanogui
@@ -762,7 +762,7 @@ private:
 
     double timestampLastUpdateUI = 0;
 
-#if MOLA_VERSION_CHECK(2, 6, 0)
+#if MOLA_VERSION_CHECK(2, 7, 0)
     bool gui_created = false;
     mola::gui::LiveString::Ptr lbIcpQuality;
     mola::gui::LiveString::Ptr lbSensorRates;
@@ -847,7 +847,7 @@ private:
   void updateVisualizationPath(std::vector<std::function<void()>> & updateTasks);
   void updateVisualizationTextLabels();
 
-#if MOLA_VERSION_CHECK(2, 6, 0)
+#if MOLA_VERSION_CHECK(2, 7, 0)
   void internalBuildGUI();
 #else
   void internalBuildGUI_Legacy();
